@@ -1,0 +1,177 @@
+#include "raylib.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h> 
+
+#define MAX 100
+
+// ---------------- STRUCTURES ----------------
+typedef struct {
+    int id;
+    char name[50];
+    char desc[100];
+    char location[50];
+    char status[10];
+    char date[15];
+} Item;
+
+Item items[MAX];
+int count = 0;
+
+typedef enum { MENU, ADD, VIEW, SEARCH, ANALYZE } Screen;
+Screen currentScreen = MENU;
+
+// ---------------- INPUT BUFFERS ----------------
+char idText[10] = "";
+char nameText[50] = "";
+char descText[100] = "";
+char locText[50] = "";
+char statusText[10] = "";
+char dateText[15] = "";
+char searchText[10] = "";
+
+int activeField = -1; 
+
+// ---------------- FUNCTIONS ----------------
+
+void AddItem() {
+    if (count < MAX) {
+        items[count].id = atoi(idText);
+        strcpy(items[count].name, nameText);
+        strcpy(items[count].desc, descText);
+        strcpy(items[count].location, locText);
+        strcpy(items[count].status, statusText);
+        strcpy(items[count].date, dateText);
+        count++;
+        idText[0] = nameText[0] = descText[0] = locText[0] = statusText[0] = dateText[0] = '\0';
+    }
+}
+
+int Button(Rectangle r, const char *text) {
+    Vector2 m = GetMousePosition();
+    bool hover = CheckCollisionPointRec(m, r);
+    DrawRectangleRec(r, hover ? SKYBLUE : LIGHTGRAY);
+    DrawRectangleLinesEx(r, 2, DARKGRAY);
+    DrawText(text, r.x + (r.width/2 - MeasureText(text, 20)/2), r.y + 15, 20, BLACK);
+    return (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON));
+}
+
+void DrawInput(Rectangle box, char *text, int fieldId, int maxLen) {
+    bool hover = CheckCollisionPointRec(GetMousePosition(), box);
+    if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) activeField = fieldId;
+
+    DrawRectangleRec(box, WHITE);
+    DrawRectangleLinesEx(box, (activeField == fieldId) ? 2 : 1, (activeField == fieldId) ? BLUE : GRAY);
+
+    if (activeField == fieldId) {
+        int key = GetCharPressed();
+        while (key > 0) {
+            int len = strlen(text);
+            if (len < maxLen) {
+                text[len] = (char)key;
+                text[len + 1] = '\0';
+            }
+            key = GetCharPressed();
+        }
+        if (IsKeyPressed(KEY_BACKSPACE)) {
+            int len = strlen(text);
+            if (len > 0) text[len - 1] = '\0';
+        }
+    }
+    DrawText(text, box.x + 5, box.y + 8, 18, BLACK);
+}
+
+// ---------------- MAIN ----------------
+int main() {
+    InitWindow(900, 600, "Lost & Found System - Final");
+    SetTargetFPS(60);
+
+    // --- ICON SETTING CODE STARTS HERE ---
+    // Pehle image load karein (ensure karein "LostandFound.png" folder mein hai)
+    Image myIcon = LoadImage("LostandFound.png"); 
+    
+    // Agar image load ho gayi hai toh icon set karein
+    if (myIcon.data != NULL) {
+        SetWindowIcon(myIcon);
+        UnloadImage(myIcon); // Icon set karne ke baad RAM se image clear kar sakte hain
+    }
+    // --- ICON SETTING CODE ENDS HERE ---
+
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+
+        if (currentScreen == MENU) {
+            DrawText("LOST & FOUND SYSTEM", 250, 50, 35, DARKBLUE);
+            if (Button((Rectangle){325, 150, 250, 50}, "ADD ITEM")) currentScreen = ADD;
+            if (Button((Rectangle){325, 220, 250, 50}, "VIEW ITEMS")) currentScreen = VIEW;
+            if (Button((Rectangle){325, 290, 250, 50}, "SEARCH ITEM")) currentScreen = SEARCH;
+            if (Button((Rectangle){325, 360, 250, 50}, "ANALYTICS")) currentScreen = ANALYZE;
+        } 
+        else if (currentScreen == ADD) {
+            DrawText("ADD NEW ITEM (Click a box to type)", 250, 30, 25, DARKBLUE);
+            
+            DrawText("ID:", 100, 100, 20, BLACK);
+            DrawInput((Rectangle){250, 95, 200, 35}, idText, 0, 9);
+
+            DrawText("Name:", 100, 150, 20, BLACK);
+            DrawInput((Rectangle){250, 145, 400, 35}, nameText, 1, 49);
+
+            DrawText("Description:", 100, 200, 20, BLACK);
+            DrawInput((Rectangle){250, 195, 400, 35}, descText, 2, 99);
+
+            DrawText("Location:", 100, 250, 20, BLACK);
+            DrawInput((Rectangle){250, 245, 400, 35}, locText, 3, 49);
+
+            DrawText("Status:", 100, 300, 20, BLACK);
+            DrawInput((Rectangle){250, 295, 200, 35}, statusText, 4, 9);
+
+            DrawText("Date:", 100, 350, 20, BLACK);
+            DrawInput((Rectangle){250, 345, 200, 35}, dateText, 5, 14);
+
+            if (Button((Rectangle){250, 450, 150, 50}, "SAVE")) { AddItem(); currentScreen = MENU; activeField = -1; }
+            if (Button((Rectangle){450, 450, 150, 50}, "BACK")) { currentScreen = MENU; activeField = -1; }
+        }
+        else if (currentScreen == VIEW) {
+            DrawText("REGISTERED ITEMS", 330, 30, 30, DARKBLUE);
+            for (int i = 0; i < count; i++) {
+                char buffer[255];
+                sprintf(buffer, "ID: %d | Name: %s | Status: %s | Loc: %s", items[i].id, items[i].name, items[i].status, items[i].location);
+                DrawText(buffer, 50, 100 + (i * 30), 18, DARKGRAY);
+            }
+            if (Button((Rectangle){375, 520, 150, 50}, "BACK")) currentScreen = MENU;
+        }
+        else if (currentScreen == SEARCH) {
+            DrawText("SEARCH BY ID", 350, 50, 30, DARKBLUE);
+            DrawInput((Rectangle){350, 150, 200, 40}, searchText, 6, 9);
+            
+            int sId = atoi(searchText);
+            for (int i = 0; i < count; i++) {
+                if (items[i].id == sId && sId != 0) {
+                    DrawText("FOUND:", 350, 250, 20, GREEN);
+                    DrawText(items[i].name, 350, 280, 25, BLACK);
+                    DrawText(items[i].desc, 350, 310, 20, GRAY);
+                    else("LOST:", 350, 250, 20, RED);
+                    DrawText(items[i].name, 350, 280, 25, BLACK);
+                    DrawText(items[i].desc, 350, 310, 20, GRAY);
+                }
+            }
+            if (Button((Rectangle){375, 450, 150, 50}, "BACK")) currentScreen = MENU;
+        }
+        else if (currentScreen == ANALYZE) {
+            DrawText("SYSTEM ANALYTICS", 330, 50, 30, DARKBLUE);
+            int lost = 0, found = 0;
+            for(int i=0; i<count; i++) {
+                if(TextIsEqual(items[i].status, "Lost")) lost++;
+                else if(TextIsEqual(items[i].status, "Found")) found++;
+            }
+            DrawText(TextFormat("Lost Items: %d", lost), 350, 200, 25, RED);
+            DrawText(TextFormat("Found Items: %d", found), 350, 250, 25, GREEN);
+            if (Button((Rectangle){375, 400, 150, 50}, "BACK")) currentScreen = MENU;
+        }
+
+        EndDrawing();
+    }
+    CloseWindow();
+    return 0;
+}
